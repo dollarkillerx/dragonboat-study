@@ -15,5 +15,7 @@
 # vendor/
 .idea
 example-data/
-helloworld/main
-helloworld/example-data
+on_mem/main
+on_mem/example-data
+on_disk/example-data
+on_disk/main

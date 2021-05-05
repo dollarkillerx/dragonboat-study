@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	sm "github.com/lni/dragonboat/v3/statemachine"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -282,8 +282,47 @@ func (d *DiskKV) queryAppliedIndex(db *pebbledb) (uint64, error) {
 	return binary.LittleEndian.Uint64(val), nil
 }
 
+// Open Open打开状态机并返回最后一个Raft Log条目的索引
 func (d *DiskKV) Open(stopc <-chan struct{}) (uint64, error) {
-	panic("implement me")
+	dir := getNodeDBDirName(d.clusterID, d.nodeID)
+	if err := createNodeDataDir(dir); err != nil {
+		panic(err)
+	}
+	var dbdir string
+	if !isNewRun(dir) {
+		if err := cleanupNodeDataDir(dir); err != nil {
+			return 0, err
+		}
+		var err error
+		dbdir, err = getCurrentDBDirName(dir)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := os.Stat(dbdir); err != nil {
+			if os.IsNotExist(err) {
+				panic("db dir unexpectedly deleted")
+			}
+		}
+	} else {
+		dbdir = getNewRandomDBDirName(dir)
+		if err := saveCurrentDBDirName(dir, dbdir); err != nil {
+			return 0, err
+		}
+		if err := replaceCurrentDBFile(dir); err != nil {
+			return 0, err
+		}
+	}
+	db, err := createDB(dbdir)
+	if err != nil {
+		return 0, err
+	}
+	atomic.SwapPointer(&d.db, unsafe.Pointer(db))
+	appliedIndex, err := d.queryAppliedIndex(db)
+	if err != nil {
+		panic(err)
+	}
+	d.lastApplied = appliedIndex
+	return appliedIndex, nil
 }
 
 func (d *DiskKV) Update(entries []sm.Entry) ([]sm.Entry, error) {
@@ -297,12 +336,13 @@ func (d *DiskKV) Update(entries []sm.Entry) ([]sm.Entry, error) {
 	wb := db.db.NewBatch()
 	defer wb.Close()
 	for idx, e := range entries {
+		fmt.Println("Update entries Idx: ", e.Index)
 		dataKV := &KVData{}
 		if err := json.Unmarshal(e.Cmd, dataKV); err != nil {
 			panic(err)
 		}
 		wb.Set([]byte(dataKV.Key), []byte(dataKV.Val), db.wo)
-		entries[idx].Result = sm.Result{Value: uint64(len(entries[idx].Cmd))}
+		entries[idx].Result = sm.Result{Value: uint64(len(entries[idx].Cmd))} // 记录日志顶层
 	}
 	// save the applied index to the DB.
 	appliedIndex := make([]byte, 8)

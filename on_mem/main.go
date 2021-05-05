@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dollarkillerx/dragonboat-study/helloworld/lib"
+	"github.com/dollarkillerx/dragonboat-study/on_mem/lib"
 	"github.com/lni/dragonboat/v3"
 	"github.com/lni/dragonboat/v3/config"
 	"github.com/lni/dragonboat/v3/logger"
@@ -141,7 +141,7 @@ func main() {
 		CompactionOverhead: 5,
 	}
 
-	datadir := filepath.Join("example-data", "helloworld-data", fmt.Sprintf("node%d", *nodeID))
+	datadir := filepath.Join("example-data", "on_mem-data", fmt.Sprintf("node%d", *nodeID))
 
 	nhc := config.NodeHostConfig{
 		WALDir:         datadir,  // 内容的存储位置。
