@@ -14,3 +14,6 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 .idea
+example-data/
+helloworld/main
+helloworld/example-data

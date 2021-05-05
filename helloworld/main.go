@@ -3,12 +3,8 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/binary"
 	"flag"
 	"fmt"
-	"github.com/dollarkillerx/dragonboat-study/helloworld/lib"
-	"github.com/lni/dragonboat/v3/config"
-	"github.com/lni/goutils/syncutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -18,8 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dollarkillerx/dragonboat-study/helloworld/lib"
 	"github.com/lni/dragonboat/v3"
+	"github.com/lni/dragonboat/v3/config"
 	"github.com/lni/dragonboat/v3/logger"
+	"github.com/lni/goutils/syncutil"
 	"github.com/pkg/errors"
 )
 
@@ -164,6 +163,8 @@ func main() {
 	raftStopper := syncutil.NewStopper()
 	consoleStopper := syncutil.NewStopper()
 	ch := make(chan string, 16)
+
+	// read stdin
 	consoleStopper.RunWorker(func() {
 		reader := bufio.NewReader(os.Stdin)
 		for {
@@ -191,9 +192,7 @@ func main() {
 				result, err := nh.SyncRead(ctx, exampleClusterID, []byte{})
 				cancel()
 				if err == nil {
-					var count uint64
-					count = binary.LittleEndian.Uint64(result.([]byte))
-					fmt.Fprintf(os.Stdout, "count: %d\n", count)
+					fmt.Fprintf(os.Stdout, "result: %s \n", result)
 				}
 			case <-raftStopper.ShouldStop():
 				return
@@ -211,7 +210,7 @@ func main() {
 				}
 
 				msg := strings.Replace(v, "\n", "", 1)
-				if cmd, addr, nodeID, err := splitMembershipChangeCmd(msg); err != nil {
+				if cmd, addr, nodeID, err := splitMembershipChangeCmd(msg); err == nil {
 					makeMembershipChange(nh, cmd, addr, nodeID)
 				} else {
 					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

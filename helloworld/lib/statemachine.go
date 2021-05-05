@@ -1,7 +1,7 @@
 package lib
 
 import (
-	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,34 +12,36 @@ import (
 type ExampleStateMachine struct {
 	ClusterID uint64
 	NodeID    uint64
-	Count     uint64
+	Data      []string
 }
 
 func NewExampleStateMachine(clusterID uint64, nodeID uint64) sm.IStateMachine {
 	return &ExampleStateMachine{
 		ClusterID: clusterID,
 		NodeID:    nodeID,
-		Count:     0,
+		Data:      []string{},
 	}
 }
 
+// update bytes输入更改的数据
 func (e *ExampleStateMachine) Update(bytes []byte) (sm.Result, error) {
-	e.Count++
-	fmt.Printf("from ExampleStateMachine.Update(), msg: %s, count %d \n", bytes, e.Count)
+	e.Data = append(e.Data, fmt.Sprintf("%v", bytes))
+	fmt.Printf("from ExampleStateMachine.Update(), msg: %s \n", bytes)
 	return sm.Result{Value: uint64(len(bytes))}, nil
 }
 
 func (e *ExampleStateMachine) Lookup(i interface{}) (interface{}, error) {
-	result := make([]byte, 8)
-	binary.LittleEndian.PutUint64(result, e.Count)
+	result, _ := json.Marshal(e.Data)
+	//binary.LittleEndian.PutUint64(result, e.Count)
+	fmt.Println("Lookup...")
 	return result, nil
 }
 
 // SaveSnapshot 快照
 func (e *ExampleStateMachine) SaveSnapshot(writer io.Writer, collection sm.ISnapshotFileCollection, done <-chan struct{}) error {
-	data := make([]byte, 8)
-	binary.LittleEndian.PutUint64(data, e.Count)
-	_, err := writer.Write(data)
+	result, _ := json.Marshal(e.Data)
+	_, err := writer.Write(result)
+	fmt.Println("SaveSnapshot...")
 	return err
 }
 
@@ -50,12 +52,12 @@ func (e *ExampleStateMachine) RecoverFromSnapshot(reader io.Reader, files []sm.S
 		return err
 	}
 
-	v := binary.LittleEndian.Uint64(data)
-	e.Count = v
-	return nil
+	fmt.Printf("RecoverFromSnapshot... : %v \n", data)
+	return json.Unmarshal(data, &e.Data)
 }
 
 // Close Close关闭IStateMachine实例
 func (e *ExampleStateMachine) Close() error {
+	fmt.Println("Close...")
 	return nil
 }
